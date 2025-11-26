@@ -275,306 +275,368 @@
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-     // Firebase Configuration - YOUR ACTUAL CONFIG
+  <script>
+// Firebase Configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBdbs-BcpCyEs3Rg7tX6KJPVCpW252AiN8",
-  authDomain: "splitfinity-58c93.firebaseapp.com",
-  projectId: "splitfinity-58c93",
-  storageBucket: "splitfinity-58c93.firebasestorage.app",
-  messagingSenderId: "221214434926",
-  appId: "1:221214434926:web:b54f3a3a35657f12ffe87f",
-  measurementId: "G-HWPDJNNRLP"
+    apiKey: "AIzaSyBdbs-BcpCyEs3Rg7tX6KJPVCpW252AiN8",
+    authDomain: "splitfinity-58c93.firebaseapp.com",
+    projectId: "splitfinity-58c93",
+    storageBucket: "splitfinity-58c93.firebasestorage.app",
+    messagingSenderId: "221214434926",
+    appId: "1:221214434926:web:b54f3a3a35657f12ffe87f",
+    measurementId: "G-HWPDJNNRLP"
 };
 
-        // Initialize Firebase
-        let auth, db;
-        let firebaseInitialized = false;
+// Initialize Firebase
+let auth, db;
+let firebaseInitialized = false;
+let currentUser = null;
+let currentTripType = null;
+let isDemoMode = false;
+let expenses = [];
+let userData = {
+    budget: 5000,
+    tripDuration: 7
+};
 
-        try {
-            // Check if Firebase config is valid
-            if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'YOUR_API_KEY') {
-                firebase.initializeApp(firebaseConfig);
-                auth = firebase.auth();
-                db = firebase.firestore();
-                firebaseInitialized = true;
-                console.log('Firebase initialized successfully');
-            } else {
-                console.error('Invalid Firebase configuration');
-            }
-        } catch (error) {
-            console.error('Firebase initialization error:', error);
+// Initialize Firebase with better error handling
+function initializeFirebase() {
+    try {
+        if (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'YOUR_API_KEY') {
+            firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+            db = firebase.firestore();
+            firebaseInitialized = true;
+            console.log('Firebase initialized successfully');
+            
+            // Set Firestore settings to handle offline scenarios
+            db.settings({
+                cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
+            });
+            
+            // Enable persistence for offline support
+            db.enablePersistence().catch((err) => {
+                console.warn('Firestore persistence failed:', err);
+            });
+        } else {
+            console.error('Invalid Firebase configuration');
             firebaseInitialized = false;
         }
+    } catch (error) {
+        console.error('Firebase initialization error:', error);
+        firebaseInitialized = false;
+    }
+}
 
-        // Global variables
-        let currentUser = null;
-        let currentTripType = null;
-        let isDemoMode = false;
-        let expenses = [];
-        let userData = {
+// Initialize the app
+document.addEventListener('DOMContentLoaded', function() {
+    initializeFirebase();
+    
+    // Check if we're already in demo mode (page refresh)
+    const savedData = localStorage.getItem('expenshare_demo_data');
+    if (savedData) {
+        enableDemoMode();
+    }
+});
+
+// Demo Mode Functions
+function enableDemoMode() {
+    isDemoMode = true;
+    currentUser = {
+        uid: 'demo-user',
+        displayName: 'Demo User',
+        email: 'demo@expenshare.com',
+        photoURL: null
+    };
+    showToast('Demo mode activated! You can explore all features.', 'success');
+    showScreen('demoAppScreen');
+    
+    // Load demo data if exists
+    loadDemoData();
+}
+
+function loadDemoData() {
+    const savedData = localStorage.getItem('expenshare_demo_data');
+    if (savedData) {
+        try {
+            const data = JSON.parse(savedData);
+            expenses = data.expenses || [];
+            userData = data.userData || userData;
+            console.log('Demo data loaded:', data);
+        } catch (e) {
+            console.error('Error loading demo data:', e);
+        }
+    }
+}
+
+function saveDemoData() {
+    if (isDemoMode) {
+        const data = {
+            expenses: expenses,
+            userData: userData,
+            lastSaved: new Date().toISOString()
+        };
+        localStorage.setItem('expenshare_demo_data', JSON.stringify(data));
+    }
+}
+
+function clearDemoData() {
+    if (confirm('Are you sure you want to clear all demo data?')) {
+        localStorage.removeItem('expenshare_demo_data');
+        expenses = [];
+        userData = {
             budget: 5000,
             tripDuration: 7
         };
+        showToast('Demo data cleared successfully!', 'success');
+    }
+}
 
-        // Initialize the app
-        document.addEventListener('DOMContentLoaded', function() {
-            checkFirebaseStatus();
-            
-            // Check if we're already in demo mode (page refresh)
-            const savedData = localStorage.getItem('expenshare_demo_data');
-            if (savedData) {
+// Improved Firebase Google Sign-In with offline handling
+async function signInWithGoogle() {
+    const googleBtn = document.getElementById('googleSignInBtn');
+    const originalText = googleBtn.innerHTML;
+    
+    try {
+        googleBtn.innerHTML = '<span class="loading-spinner"></span> Connecting to Google...';
+        googleBtn.disabled = true;
+
+        if (!firebaseInitialized || !auth) {
+            throw new Error('Firebase is not properly configured. Please use Demo Mode.');
+        }
+
+        const provider = new firebase.auth.GoogleAuthProvider();
+        provider.addScope('profile');
+        provider.addScope('email');
+        
+        console.log('Starting Google Sign-In...');
+        const result = await auth.signInWithPopup(provider);
+        const user = result.user;
+        
+        console.log('Google Sign-In successful:', user);
+        showToast(`Welcome ${user.displayName}!`, 'success');
+        
+        // Try to save user data with offline handling
+        try {
+            await saveUserToFirestore(user);
+        } catch (firestoreError) {
+            console.warn('Firestore operation failed, continuing in offline mode:', firestoreError);
+            showToast('Signed in! (Working in offline mode)', 'info');
+        }
+        
+        currentUser = user;
+        showScreen('demoAppScreen');
+        
+    } catch (error) {
+        console.error('Google Sign-In Error:', error);
+        handleAuthError(error);
+    } finally {
+        googleBtn.innerHTML = originalText;
+        googleBtn.disabled = false;
+    }
+}
+
+// Improved user saving with better error handling
+async function saveUserToFirestore(user) {
+    if (!db) {
+        throw new Error('Firestore not available');
+    }
+    
+    const userRef = db.collection('users').doc(user.uid);
+    
+    try {
+        const userDoc = await userRef.get();
+        
+        if (!userDoc.exists) {
+            await userRef.set({
+                name: user.displayName,
+                email: user.email,
+                photoURL: user.photoURL,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                budget: 5000,
+                tripDuration: 7,
+                provider: 'google',
+                lastLogin: new Date().toISOString()
+            });
+            console.log('User document created successfully');
+        } else {
+            await userRef.update({
+                lastLogin: new Date().toISOString(),
+                photoURL: user.photoURL,
+                name: user.displayName
+            });
+            console.log('User document updated successfully');
+        }
+    } catch (error) {
+        // If Firestore is offline, we'll continue without it
+        if (error.code === 'failed-precondition' || 
+            error.code === 'unavailable' ||
+            error.message.includes('offline')) {
+            console.log('Firestore offline, continuing without database operations');
+            throw error; // Re-throw to be handled by caller
+        } else {
+            console.error('Error saving user to Firestore:', error);
+            throw error;
+        }
+    }
+}
+
+// Comprehensive error handling
+function handleAuthError(error) {
+    console.error('Authentication Error:', error);
+    
+    let errorMessage = 'Failed to sign in with Google. ';
+    let suggestDemo = false;
+    
+    switch (error.code) {
+        case 'auth/unauthorized-domain':
+            errorMessage = 'This domain is not authorized for Google Sign-In. ';
+            suggestDemo = true;
+            break;
+        case 'auth/network-request-failed':
+            errorMessage = 'Network error. Please check your internet connection. ';
+            suggestDemo = true;
+            break;
+        case 'auth/popup-closed-by-user':
+            errorMessage = 'Sign-in was cancelled.';
+            break;
+        case 'auth/operation-not-allowed':
+            errorMessage = 'Google Sign-In is not enabled in Firebase Console.';
+            suggestDemo = true;
+            break;
+        case 'auth/api-key-not-valid':
+            errorMessage = 'Firebase API key is not valid. Please check your configuration.';
+            suggestDemo = true;
+            break;
+        case 'auth/configuration-not-found':
+            errorMessage = 'Firebase configuration not found. Please set up Firebase properly.';
+            suggestDemo = true;
+            break;
+        case 'failed-precondition':
+        case 'unavailable':
+            errorMessage = 'Database temporarily unavailable. You can continue in offline mode.';
+            suggestDemo = true;
+            break;
+        default:
+            if (error.message && error.message.includes('offline')) {
+                errorMessage = 'Network connection issue. Please try demo mode.';
+                suggestDemo = true;
+            } else {
+                errorMessage += error.message;
+                suggestDemo = true;
+            }
+    }
+    
+    showToast(errorMessage, 'error');
+    
+    if (suggestDemo) {
+        setTimeout(() => {
+            if (confirm('Google Sign-In failed. Would you like to try Demo Mode instead?')) {
                 enableDemoMode();
             }
-        });
+        }, 1500);
+    }
+}
 
-        // Check Firebase status and update UI
-        function checkFirebaseStatus() {
-            const statusElement = document.getElementById('firebaseStatus');
-            const configStatusElement = document.getElementById('configStatus');
-            
-            if (firebaseInitialized) {
-                statusElement.innerHTML = '<div class="status-indicator status-connected"><i class="fas fa-check-circle"></i> Firebase Connected</div>';
-                configStatusElement.innerHTML = `
-                    <p class="text-success"><i class="fas fa-check"></i> Firebase configuration is valid</p>
-                    <p class="text-muted small">Project: ${firebaseConfig.projectId}</p>
-                `;
-            } else {
-                statusElement.innerHTML = '<div class="status-indicator status-error"><i class="fas fa-exclamation-triangle"></i> Firebase Not Configured</div>';
-                configStatusElement.innerHTML = `
-                    <p class="text-danger"><i class="fas fa-exclamation-triangle"></i> Using Demo Mode Only</p>
-                    <p class="text-muted small">Google Sign-in will not work until Firebase is properly configured</p>
-                `;
-            }
-        }
-
-        // Demo Mode Functions
-        function enableDemoMode() {
-            isDemoMode = true;  
-            currentUser = {
-                uid: 'demo-user',
-                displayName: 'Demo User',
-                email: 'demo@expenshare.com',
-                photoURL: null
-            };
-            showToast('Demo mode activated! You can explore all features.', 'success');
+// Firebase Auth State Listener with offline support
+if (firebaseInitialized && auth) {
+    auth.onAuthStateChanged((user) => {
+        console.log('Auth state changed:', user);
+        if (user && !isDemoMode) {
+            currentUser = user;
+            showToast(`Welcome back, ${user.displayName || 'User'}!`, 'success');
             showScreen('demoAppScreen');
-            
-            // Load demo data if exists
-            loadDemoData();
         }
+    });
+}
 
-        function loadDemoData() {
-            const savedData = localStorage.getItem('expenshare_demo_data');
-            if (savedData) {
-                try {
-                    const data = JSON.parse(savedData);
-                    expenses = data.expenses || [];
-                    userData = data.userData || userData;
-                    console.log('Demo data loaded:', data);
-                } catch (e) {
-                    console.error('Error loading demo data:', e);
-                }
-            }
+// Navigation Functions
+function showScreen(screenId) {
+    document.querySelectorAll('.screen').forEach(screen => {
+        screen.classList.remove('active-screen');
+    });
+    document.getElementById(screenId).classList.add('active-screen');
+}
+
+function selectTripType(type) {
+    currentTripType = type;
+    if (type === 'group') {
+        startGroupTrip();
+    } else {
+        startSoloTrip();
+    }
+}
+
+function startGroupTrip() {
+    currentTripType = 'group';
+    showToast('Group trip started! Add expenses to begin tracking.', 'success');
+    // Here you would navigate to the group trip dashboard
+    setTimeout(() => {
+        alert('Group Trip Dashboard would open here with expense tracking features!');
+    }, 500);
+}
+
+function startSoloTrip() {
+    currentTripType = 'solo';
+    showToast('Solo trip started! Set your budget and track expenses.', 'success');
+    // Here you would navigate to the solo trip dashboard
+    setTimeout(() => {
+        alert('Solo Trip Dashboard would open here with budget tracking features!');
+    }, 500);
+}
+
+function logout() {
+    if (isDemoMode) {
+        isDemoMode = false;
+        currentUser = null;
+        saveDemoData();
+        showToast('Demo mode ended. All local data saved.', 'info');
+    } else if (firebaseInitialized && auth) {
+        auth.signOut();
+        showToast('Signed out successfully!', 'success');
+    }
+    showScreen('authScreen');
+}
+
+// Toast Notification Function
+function showToast(message, type = 'info') {
+    const toastContainer = document.querySelector('.toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} border-0`;
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info'} me-2"></i>
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    toastContainer.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    
+    // Auto-remove after 4 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.remove();
         }
+    }, 4000);
+}
 
-        function saveDemoData() {
-            if (isDemoMode) {
-                const data = {
-                    expenses: expenses,
-                    userData: userData,
-                    lastSaved: new Date().toISOString()
-                };
-                localStorage.setItem('expenshare_demo_data', JSON.stringify(data));
-            }
-        }
+// Test Firebase connection
+function testFirebaseConnection() {
+    if (firebaseInitialized && auth) {
+        console.log('Testing Firebase connection...');
+        auth.onAuthStateChanged((user) => {
+            console.log('Firebase connection test - Auth state:', user ? 'Connected' : 'Not connected');
+        });
+    }
+}
 
-        function clearDemoData() {
-            if (confirm('Are you sure you want to clear all demo data?')) {
-                localStorage.removeItem('expenshare_demo_data');
-                expenses = [];
-                userData = {
-                    budget: 5000,
-                    tripDuration: 7
-                };
-                showToast('Demo data cleared successfully!', 'success');
-            }
-        }
-
-        // Firebase Google Sign-In
-        async function signInWithGoogle() {
-            const googleBtn = document.getElementById('googleSignInBtn');
-            const originalText = googleBtn.innerHTML;
-            
-            try {
-                googleBtn.innerHTML = '<span class="loading-spinner"></span> Connecting to Google...';
-                googleBtn.disabled = true;
-
-                if (!firebaseInitialized || !auth) {
-                    throw new Error('Firebase is not properly configured. Please use Demo Mode.');
-                }
-
-                const provider = new firebase.auth.GoogleAuthProvider();
-                provider.addScope('profile');
-                provider.addScope('email');
-                
-                console.log('Starting Google Sign-In...');
-                const result = await auth.signInWithPopup(provider);
-                const user = result.user;
-                
-                console.log('Google Sign-In successful:', user);
-                
-                // Check if user exists in Firestore
-                const userDoc = await db.collection('users').doc(user.uid).get();
-                
-                if (!userDoc.exists) {
-                    console.log('Creating new user document...');
-                    // Create new user document
-                    await db.collection('users').doc(user.uid).set({
-                        name: user.displayName,
-                        email: user.email,
-                        photoURL: user.photoURL,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        budget: 5000,
-                        tripDuration: 7,
-                        provider: 'google',
-                        lastLogin: new Date().toISOString()
-                    });
-                    console.log('User document created successfully');
-                } else {
-                    // Update last login
-                    await db.collection('users').doc(user.uid).update({
-                        lastLogin: new Date().toISOString()
-                    });
-                }
-                
-                showToast(`Welcome ${user.displayName}!`, 'success');
-                console.log('User authenticated successfully');
-                
-            } catch (error) {
-                console.error('Google Sign-In Error:', error);
-                
-                let errorMessage = 'Failed to sign in with Google. ';
-                
-                if (error.code === 'auth/popup-closed-by-user') {
-                    errorMessage = 'Sign-in was cancelled.';
-                } else if (error.code === 'auth/network-request-failed') {
-                    errorMessage = 'Network error. Please check your internet connection.';
-                } else if (error.code === 'auth/api-key-not-valid') {
-                    errorMessage = 'Firebase API key is not valid. Please check your configuration.';
-                } else if (error.code === 'auth/configuration-not-found') {
-                    errorMessage = 'Firebase configuration not found. Please set up Firebase properly.';
-                } else if (error.code === 'auth/operation-not-allowed') {
-                    errorMessage = 'Google Sign-In is not enabled in Firebase Console.';
-                } else if (error.code === 'auth/unauthorized-domain') {
-                    errorMessage = 'This domain is not authorized for Google Sign-In.';
-                } else {
-                    errorMessage += error.message;
-                }
-                
-                showToast(errorMessage, 'error');
-                
-                // Offer demo mode as fallback
-                setTimeout(() => {
-                    if (confirm('Google Sign-In failed. Would you like to try Demo Mode instead?')) {
-                        enableDemoMode();
-                    }
-                }, 1500);
-            } finally {
-                googleBtn.innerHTML = originalText;
-                googleBtn.disabled = false;
-            }
-        }
-
-        // Firebase Auth State Listener
-        if (firebaseInitialized && auth) {
-            auth.onAuthStateChanged((user) => {
-                console.log('Auth state changed:', user);
-                if (user && !isDemoMode) {
-                    currentUser = user;
-                    showToast(`Welcome back, ${user.displayName || 'User'}!`, 'success');
-                    showScreen('demoAppScreen');
-                }
-            });
-        }
-
-        // Navigation Functions
-        function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(screen => {
-                screen.classList.remove('active-screen');
-            });
-            document.getElementById(screenId).classList.add('active-screen');
-        }
-
-        function startGroupTrip() {
-            currentTripType = 'group';
-            showToast('Group trip started! Add expenses to begin tracking.', 'success');
-            // Here you would navigate to the group trip dashboard
-            // For now, we'll just show a message
-            setTimeout(() => {
-                alert('Group Trip Dashboard would open here with expense tracking features!');
-            }, 500);
-        }
-
-        function startSoloTrip() {
-            currentTripType = 'solo';
-            showToast('Solo trip started! Set your budget and track expenses.', 'success');
-            // Here you would navigate to the solo trip dashboard
-            setTimeout(() => {
-                alert('Solo Trip Dashboard would open here with budget tracking features!');
-            }, 500);
-        }
-
-        function logout() {
-            if (isDemoMode) {
-                isDemoMode = false;
-                currentUser = null;
-                showToast('Demo mode ended. All local data saved.', 'info');
-            } else if (firebaseInitialized && auth) {
-                auth.signOut();
-                showToast('Signed out successfully!', 'success');
-            }
-            showScreen('authScreen');
-        }
-
-        // Toast Notification Function
-        function showToast(message, type = 'info') {
-            const toastContainer = document.querySelector('.toast-container');
-            const toast = document.createElement('div');
-            toast.className = `toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} border-0`;
-            toast.innerHTML = `
-                <div class="d-flex">
-                    <div class="toast-body">
-                        <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info'} me-2"></i>
-                        ${message}
-                    </div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-                </div>
-            `;
-            toastContainer.appendChild(toast);
-            const bsToast = new bootstrap.Toast(toast);
-            bsToast.show();
-            setTimeout(() => {
-                if (toast.parentNode) {
-                    toast.remove();
-                }
-            }, 4000);
-        }
-
-        // Test Firebase connection
-        function testFirebaseConnection() {
-            if (firebaseInitialized && auth) {
-                console.log('Testing Firebase connection...');
-                // Try a simple operation to test connectivity
-                auth.onAuthStateChanged((user) => {
-                    console.log('Firebase connection test - Auth state:', user ? 'Connected' : 'Not connected');
-                });
-            }
-        }
-
-        // Run connection test on load
-        setTimeout(testFirebaseConnection, 1000);
-    </script>
+// Run connection test on load
+setTimeout(testFirebaseConnection, 1000);
+</script>
 
     <!-- Firebase Setup Guide -->
     <script>
