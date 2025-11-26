@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExpenShare - Smart Expense Tracking</title>
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4361EE;
+            --primary-light: #EFF2FF;
+            --secondary: #00B4D8;
+            --accent: #FF6B9D;
+            --success: #00E6A1;
+            --warning: #FFC107;
+            --danger: #FF4D7C;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .screen {
+            display: none;
+            min-height: 100vh;
+        }
+        
+        .active-screen {
+            display: block;
+        }
+        
+        .auth-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        
+        .auth-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 440px;
+            text-align: center;
+        }
+        
+        .logo {
+            font-size: 2.5rem;
+            font-weight: bold;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        
+        .google-btn {
+            background: white;
+            color: #757575;
+            border: 2px solid #E0E0E0;
+            border-radius: 12px;
+            padding: 15px 24px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            width: 100%;
+            margin: 20px 0;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .google-btn:hover {
+            background: #F8F9FA;
+            border-color: #D0D0D0;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .demo-btn {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 15px 24px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            margin: 10px 0;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .demo-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(67, 97, 238, 0.3);
+        }
+        
+        .info-box {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 25px;
+            text-align: left;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        
+        .status-connected {
+            background: var(--success);
+            color: white;
+        }
+        
+        .status-warning {
+            background: var(--warning);
+            color: black;
+        }
+        
+        .status-error {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .toast {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .setup-steps {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .step-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Auth Screen -->
+    <div class="screen active-screen" id="authScreen">
+        <div class="auth-container">
+            <div class="auth-card">
+                <div class="logo">ExpenShare</div>
+                <p class="text-muted mb-4">Track and split expenses the smart way</p>
+                
+                <!-- Connection Status -->
+                <div class="status-badge" id="connectionStatus">
+                    <i class="fas fa-sync fa-spin"></i> Checking Connection...
+                </div>
+                
+                <!-- Google Sign-In Button -->
+                <button class="google-btn" onclick="signInWithGoogle()" id="googleSignInBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Continue with Google
+                </button>
+                
+                <!-- Demo Mode Button -->
+                <button class="demo-btn" onclick="enableDemoMode()">
+                    <i class="fas fa-rocket"></i>
+                    Try Demo Mode
+                </button>
+
+                <!-- Setup Instructions -->
+                <div class="setup-steps">
+                    <h6><i class="fas fa-cog"></i> Firebase Setup Required</h6>
+                    <div class="mt-3">
+                        <div class="mb-3">
+                            <span class="step-number">1</span>
+                            <strong>Enable Google Sign-in:</strong>
+                            <p class="small text-muted mb-0">Go to Firebase Console → Authentication → Sign-in method → Enable Google</p>
+                        </div>
+                        <div class="mb-3">
+                            <span class="step-number">2</span>
+                            <strong>Add Authorized Domains:</strong>
+                            <p class="small text-muted mb-0">In Authentication → Settings → Authorized domains, add: <code>localhost</code> and <code>127.0.0.1</code></p>
+                        </div>
+                        <div>
+                            <span class="step-number">3</span>
+                            <strong>Enable Firestore:</strong>
+                            <p class="small text-muted mb-0">Go to Firestore Database → Create database → Start in test mode</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Current URL Info -->
+                <div class="info-box mt-3">
+                    <p class="small text-muted mb-1"><strong>Current URL:</strong> <code id="currentUrl"></code></p>
+                    <p class="small text-muted mb-0"><strong>Required:</strong> <code>http://localhost/your-folder/</code></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Screen -->
+    <div class="screen" id="appScreen">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center mb-4 mt-4">
+                <h1 class="text-white"><i class="fas fa-chart-pie me-2"></i>ExpenShare</h1>
+                <button class="btn btn-light" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100 shadow">
+                        <div class="card-body text-center p-5">
+                            <div class="mb-4">
+                                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #4361EE, #00B4D8); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                                    <i class="fas fa-users text-white" style="font-size: 30px;"></i>
+                                </div>
+                                <h4>Group Trip</h4>
+                                <p class="text-muted">Split expenses with friends and family</p>
+                            </div>
+                            <button class="btn btn-primary" onclick="startGroupTrip()">
+                                <i class="fas fa-play"></i>
+                                Start Group Trip
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100 shadow">
+                        <div class="card-body text-center p-5">
+                            <div class="mb-4">
+                                <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #FF6B9D, #FF4D7C); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                                    <i class="fas fa-user text-white" style="font-size: 30px;"></i>
+                                </div>
+                                <h4>Solo Trip</h4>
+                                <p class="text-muted">Track your personal expenses</p>
+                            </div>
+                            <button class="btn btn-primary" onclick="startSoloTrip()">
+                                <i class="fas fa-play"></i>
+                                Start Solo Trip
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="alert alert-info mt-4">
+                <i class="fas fa-info-circle"></i>
+                <strong id="demoStatus">Welcome to ExpenShare!</strong> Choose a trip type to start tracking expenses.
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed top-0 end-0 p-3"></div>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBdbs-BcpCyEs3Rg7tX6KJPVCpW252AiN8",
+            authDomain: "splitfinity-58c93.firebaseapp.com",
+            projectId: "splitfinity-58c93",
+            storageBucket: "splitfinity-58c93.firebasestorage.app",
+            messagingSenderId: "221214434926",
+            appId: "1:221214434926:web:b54f3a3a35657f12ffe87f",
+            measurementId: "G-HWPDJNNRLP"
+        };
+
+        // Global variables
+        let auth, db;
+        let firebaseInitialized = false;
+        let currentUser = null;
+        let isDemoMode = false;
+
+        // Initialize Firebase and check environment
+        function initializeApp() {
+            const currentUrl = window.location.href;
+            document.getElementById('currentUrl').textContent = currentUrl;
+            
+            console.log('🌐 Environment Check:', {
+                protocol: window.location.protocol,
+                hostname: window.location.hostname,
+                href: currentUrl
+            });
+
+            // Check if we're in a supported environment
+            const isLocalhost = window.location.hostname === 'localhost' || 
+                              window.location.hostname === '127.0.0.1';
+            const isHttp = window.location.protocol === 'http:' || 
+                          window.location.protocol === 'https:';
+
+            if (isLocalhost && isHttp) {
+                try {
+                    // Initialize Firebase
+                    firebase.initializeApp(firebaseConfig);
+                    auth = firebase.auth();
+                    db = firebase.firestore();
+                    firebaseInitialized = true;
+                    
+                    document.getElementById('connectionStatus').innerHTML = 
+                        '<div class="status-badge status-connected"><i class="fas fa-check-circle"></i> Firebase Ready</div>';
+                    
+                    console.log('✅ Firebase initialized successfully');
+                    
+                    // Set up auth state listener
+                    auth.onAuthStateChanged(handleAuthStateChange);
+                    
+                } catch (error) {
+                    console.error('❌ Firebase initialization failed:', error);
+                    document.getElementById('connectionStatus').innerHTML = 
+                        '<div class="status-badge status-error"><i class="fas fa-exclamation-triangle"></i> Firebase Error</div>';
+                }
+            } else {
+                console.warn('⚠️ Unsupported environment');
+                document.getElementById('connectionStatus').innerHTML = 
+                    '<div class="status-badge status-warning"><i class="fas fa-exclamation-triangle"></i> Use http://localhost</div>';
+            }
+        }
+
+        // Handle authentication state changes
+        function handleAuthStateChange(user) {
+            console.log('🔐 Auth state changed:', user);
+            
+            if (user) {
+                // User signed in successfully
+                currentUser = user;
+                isDemoMode = false;
+                showAppScreen(user);
+                showToast(`🎉 Welcome ${user.displayName || 'User'}!`, 'success');
+                
+                // Save user to Firestore
+                saveUserToFirestore(user);
+            } else {
+                // User signed out
+                currentUser = null;
+                showAuthScreen();
+            }
+        }
+
+        // Save user to Firestore
+        async function saveUserToFirestore(user) {
+            if (!firebaseInitialized || !db) return;
+            
+            try {
+                const userRef = db.collection('users').doc(user.uid);
+                const userDoc = await userRef.get();
+                
+                if (!userDoc.exists) {
+                    await userRef.set({
+                        name: user.displayName,
+                        email: user.email,
+                        photoURL: user.photoURL,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        budget: 5000,
+                        tripDuration: 7,
+                        provider: 'google',
+                        lastLogin: new Date().toISOString()
+                    });
+                    console.log('✅ New user saved to Firestore');
+                } else {
+                    await userRef.update({
+                        lastLogin: new Date().toISOString()
+                    });
+                    console.log('✅ User login updated');
+                }
+            } catch (error) {
+                console.error('❌ Error saving user to Firestore:', error);
+            }
+        }
+
+        // Google Sign-In
+        async function signInWithGoogle() {
+            if (!firebaseInitialized) {
+                showToast('❌ Firebase not available. Using Demo Mode.', 'error');
+                enableDemoMode();
+                return;
+            }
+
+            const googleBtn = document.getElementById('googleSignInBtn');
+            const originalText = googleBtn.innerHTML;
+            
+            try {
+                googleBtn.innerHTML = '<span class="loading-spinner"></span> Connecting...';
+                googleBtn.disabled = true;
+
+                const provider = new firebase.auth.GoogleAuthProvider();
+                provider.addScope('profile');
+                provider.addScope('email');
+                
+                console.log('🔐 Starting Google Sign-In...');
+                await auth.signInWithPopup(provider);
+                // Success handled by auth state listener
+                
+            } catch (error) {
+                console.error('❌ Google Sign-In Error:', error);
+                
+                let errorMessage = 'Failed to sign in with Google. ';
+                
+                if (error.code === 'auth/popup-closed-by-user') {
+                    errorMessage = 'Sign-in was cancelled.';
+                } else if (error.code === 'auth/network-request-failed') {
+                    errorMessage = 'Network error. Please check your connection.';
+                } else if (error.code === 'auth/unauthorized-domain') {
+                    errorMessage = 'This domain is not authorized. Please add localhost to Firebase authorized domains.';
+                } else if (error.code === 'auth/operation-not-supported-in-this-environment') {
+                    errorMessage = 'Please access via http://localhost in XAMPP.';
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                showToast(errorMessage, 'error');
+                
+                // Fallback to demo mode
+                setTimeout(() => {
+                    if (confirm('Google Sign-In unavailable. Use Demo Mode?')) {
+                        enableDemoMode();
+                    }
+                }, 2000);
+            } finally {
+                googleBtn.innerHTML = originalText;
+                googleBtn.disabled = false;
+            }
+        }
+
+        // Demo Mode
+        function enableDemoMode() {
+            isDemoMode = true;
+            currentUser = {
+                uid: 'demo-user',
+                displayName: 'Demo User',
+                email: 'demo@expenshare.com'
+            };
+            
+            showAppScreen(currentUser);
+            showToast('🚀 Demo mode activated! Explore all features.', 'success');
+        }
+
+        // Show app screen
+        function showAppScreen(user) {
+            document.getElementById('demoStatus').textContent = isDemoMode ? 
+                'Demo Mode Active - All data is stored locally in your browser' : 
+                `Welcome ${user.displayName || 'User'}! - Real-time data with Firebase`;
+            
+            showScreen('appScreen');
+        }
+
+        // Show auth screen
+        function showAuthScreen() {
+            isDemoMode = false;
+            currentUser = null;
+            showScreen('authScreen');
+        }
+
+        // Navigation
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active-screen');
+            });
+            document.getElementById(screenId).classList.add('active-screen');
+        }
+
+        function startGroupTrip() {
+            const typeName = 'Group';
+            showToast(`🏁 ${typeName} trip selected! Ready to track expenses.`, 'success');
+            // Add your group trip logic here
+        }
+
+        function startSoloTrip() {
+            const typeName = 'Solo';
+            showToast(`🏁 ${typeName} trip selected! Ready to track expenses.`, 'success');
+            // Add your solo trip logic here
+        }
+
+        function logout() {
+            if (isDemoMode) {
+                showToast('👋 Demo session ended.', 'info');
+            } else if (firebaseInitialized && auth) {
+                auth.signOut();
+            }
+            showAuthScreen();
+        }
+
+        // Toast notifications
+        function showToast(message, type = 'info') {
+            const toastContainer = document.querySelector('.toast-container');
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? '#00E6A1' : type === 'error' ? '#FF4D7C' : '#4361EE';
+            
+            toast.className = `toast align-items-center text-white border-0`;
+            toast.style.background = bgColor;
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            toastContainer.appendChild(toast);
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+            setTimeout(() => {
+                if (toast.parentNode) toast.remove();
+            }, 4000);
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initializeApp);
+    </script>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
