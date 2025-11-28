@@ -902,93 +902,11 @@
             background: var(--primary-light);
             color: var(--primary);
         }
-
-        /* New styles for settlement flow */
-        .settlement-history {
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border);
-        }
-
-        .settlement-history-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 15px;
-            margin-bottom: 10px;
-            background: var(--gray-light);
-            border-radius: 10px;
-        }
-
-        .settlement-history-date {
-            font-size: 12px;
-            color: var(--gray);
-        }
-
-        .participant-details-card {
-            background: white;
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 15px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-        }
-
-        .participant-details-card h6 {
-            margin-bottom: 15px;
-            color: var(--primary);
-        }
-
-        .participant-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .participant-stat {
-            text-align: center;
-            padding: 15px;
-            background: var(--primary-light);
-            border-radius: 12px;
-        }
-
-        .participant-stat-value {
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-
-        .participant-stat-label {
-            font-size: 12px;
-            color: var(--gray);
-        }
-
-        .settlement-checkbox {
-            margin-right: 10px;
-        }
-
-        .partial-settlement {
-            background: var(--warning);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 8px;
-            font-size: 10px;
-            margin-left: 8px;
-        }
-
-        .settlement-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .amount-input {
-            width: 100px;
-            margin-left: 10px;
-        }
     </style>
 </head>
 <body>
+
+
     <!-- Floating Background Shapes -->
     <div class="floating-shapes">
         <div class="shape shape-1"></div>
@@ -1364,48 +1282,34 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary" onclick="markSelectedAsSettled()">Mark Selected as Settled</button>
+                    <button type="button" class="btn btn-primary" onclick="markAsSettled()">Mark as Settled</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Participant Details Modal -->
-    <div class="modal fade" id="participantDetailsModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title gradient-text" id="participantDetailsTitle">Participant Details</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div id="participantDetailsContent">
-                        <!-- Content will be dynamically populated -->
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary" onclick="showScreen('addExpenseScreen')">Add Expense</button>
-                    <button type="button" class="btn btn-outline-primary" onclick="showSettlementForParticipant()">Settle Balance</button>
-                </div>
-            </div>
-        </div>
-    </div>
+
+
+
+
+
+    
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>
         // Firebase configuration - REPLACE WITH YOUR ACTUAL FIREBASE CONFIG
-        const firebaseConfig = {
-          apiKey: "AIzaSyBdbs-BcpCyEs3Rg7tX6KJPVCpW252AiN8",
-          authDomain: "splitfinity-58c93.firebaseapp.com",
-          projectId: "splitfinity-58c93",
-          storageBucket: "splitfinity-58c93.firebasestorage.app",
-          messagingSenderId: "221214434926",
-          appId: "1:221214434926:web:b54f3a3a35657f12ffe87f",
-          measurementId: "G-HWPDJNNRLP"
-        };
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBdbs-BcpCyEs3Rg7tX6KJPVCpW252AiN8",
+  authDomain: "splitfinity-58c93.firebaseapp.com",
+  projectId: "splitfinity-58c93",
+  storageBucket: "splitfinity-58c93.firebasestorage.app",
+  messagingSenderId: "221214434926",
+  appId: "1:221214434926:web:b54f3a3a35657f12ffe87f",
+  measurementId: "G-HWPDJNNRLP"
+};
 
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
@@ -1416,12 +1320,9 @@
         let currentTripType = null;
         let participants = ['You'];
         let expenses = [];
-        let settlements = [];
         let currentUser = 'You';
         let currentSettlementPerson = null;
         let currentUserId = null;
-        let currentParticipantDetails = null;
-        let selectedSettlements = [];
 
         // Firebase Auth State Observer
         auth.onAuthStateChanged((user) => {
@@ -1493,26 +1394,10 @@
                         expenses.push(expenseData);
                     });
                     
-                    // Load settlements
-                    db.collection('users').doc(currentUserId).collection('settlements')
-                        .orderBy('timestamp', 'desc')
-                        .get()
-                        .then((querySnapshot) => {
-                            settlements = [];
-                            querySnapshot.forEach((doc) => {
-                                const settlementData = doc.data();
-                                settlementData.id = doc.id;
-                                settlements.push(settlementData);
-                            });
-                            
-                            // Update dashboard if we're on it
-                            if (document.getElementById('dashboardScreen').classList.contains('active-screen')) {
-                                updateDashboard();
-                            }
-                        })
-                        .catch((error) => {
-                            console.error('Error loading settlements:', error);
-                        });
+                    // Update dashboard if we're on it
+                    if (document.getElementById('dashboardScreen').classList.contains('active-screen')) {
+                        updateDashboard();
+                    }
                 })
                 .catch((error) => {
                     console.error('Error loading expenses:', error);
@@ -1539,25 +1424,6 @@
                 });
         }
 
-        // Save settlement to Firestore
-        function saveSettlementToFirestore(settlement) {
-            if (!currentUserId) {
-                showToast('You must be signed in to save settlements', 'error');
-                return;
-            }
-            
-            // Add the settlement to Firestore
-            db.collection('users').doc(currentUserId).collection('settlements').add(settlement)
-                .then((docRef) => {
-                    settlement.id = docRef.id;
-                    showToast('Settlement saved successfully!', 'success');
-                })
-                .catch((error) => {
-                    console.error('Error saving settlement:', error);
-                    showToast('Error saving settlement', 'error');
-                });
-        }
-
         // Delete expense from Firestore
         function deleteExpenseFromFirestore(expenseId) {
             if (!currentUserId) return;
@@ -1575,10 +1441,8 @@
         // Reset app data when user signs out
         function resetAppData() {
             expenses = [];
-            settlements = [];
             participants = ['You'];
             currentTripType = null;
-            selectedSettlements = [];
             
             // Reset UI elements
             document.getElementById('expensesList').innerHTML = `
@@ -2060,24 +1924,10 @@
             // Calculate balances for each person
             const balances = calculateBalances();
             
-            // Filter out zero balances and display only those with remaining amounts
-            const remainingBalances = Object.keys(balances).filter(person => Math.abs(balances[person]) > 0.01);
-            
-            if (remainingBalances.length === 0) {
-                balancesList.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-check-circle"></i>
-                        <h4>All balances settled!</h4>
-                        <p>All expenses have been settled between participants</p>
-                    </div>
-                `;
-                return;
-            }
-            
             // Display balances
             balancesList.innerHTML = '';
             
-            remainingBalances.forEach(person => {
+            Object.keys(balances).forEach(person => {
                 const balance = balances[person];
                 const balanceItem = document.createElement('div');
                 balanceItem.className = 'balance-item';
@@ -2108,86 +1958,41 @@
             });
         }
         
-        // Calculate individual debts between people
-        function calculateIndividualDebts() {
-            const debts = {};
-            
-            // Initialize debts structure
-            expenses.forEach(expense => {
-                expense.participants.forEach(participant => {
-                    if (!debts[participant]) {
-                        debts[participant] = {};
-                    }
-                    expense.participants.forEach(otherParticipant => {
-                        if (participant !== otherParticipant && !debts[participant][otherParticipant]) {
-                            debts[participant][otherParticipant] = 0;
-                        }
-                    });
-                });
-            });
-            
-            // Calculate debts from expenses
-            expenses.forEach(expense => {
-                const paidBy = expense.paidBy;
-                Object.keys(expense.splits).forEach(participant => {
-                    if (participant !== paidBy) {
-                        // This participant owes money to the person who paid
-                        if (!debts[participant][paidBy]) {
-                            debts[participant][paidBy] = 0;
-                        }
-                        debts[participant][paidBy] += expense.splits[participant];
-                    }
-                });
-            });
-            
-            // Apply settlements to reduce individual debts
-            settlements.forEach(settlement => {
-                if (debts[settlement.fromPerson] && debts[settlement.fromPerson][settlement.toPerson]) {
-                    debts[settlement.fromPerson][settlement.toPerson] -= settlement.amount;
-                    if (debts[settlement.fromPerson][settlement.toPerson] < 0) {
-                        debts[settlement.fromPerson][settlement.toPerson] = 0;
-                    }
-                }
-            });
-            
-            return debts;
-        }
-        
-        // Calculate balances (considering settlements) - FIXED VERSION
+        // Calculate balances
         function calculateBalances() {
-            const individualDebts = calculateIndividualDebts();
             const balances = {};
             
             // Initialize balances for all participants
-            Object.keys(individualDebts).forEach(person => {
-                if (!balances[person]) {
-                    balances[person] = 0;
-                }
-                Object.keys(individualDebts[person]).forEach(otherPerson => {
-                    // Person owes money to otherPerson
-                    balances[person] -= individualDebts[person][otherPerson];
-                    // OtherPerson is owed money by person
-                    if (!balances[otherPerson]) {
-                        balances[otherPerson] = 0;
+            expenses.forEach(expense => {
+                expense.participants.forEach(participant => {
+                    if (!balances[participant]) {
+                        balances[participant] = 0;
                     }
-                    balances[otherPerson] += individualDebts[person][otherPerson];
+                });
+            });
+            
+            // Calculate net balances
+            expenses.forEach(expense => {
+                // Person who paid gets credited
+                balances[expense.paidBy] += expense.amount;
+                
+                // Participants who owe get debited
+                Object.keys(expense.splits).forEach(participant => {
+                    balances[participant] -= expense.splits[participant];
                 });
             });
             
             return balances;
         }
         
-        // Show settlement details with individual amounts
+        // Show settlement details
         function showSettlementDetails(person, balances) {
             currentSettlementPerson = person;
-            const individualDebts = calculateIndividualDebts();
+            const balance = balances[person];
             
             document.getElementById('settlementModalTitle').textContent = `Settlement - ${person}`;
             
             const settlementContent = document.getElementById('settlementContent');
-            selectedSettlements = [];
-            
-            const balance = balances[person];
             
             if (balance >= 0) {
                 // Person needs to receive money
@@ -2197,38 +2002,26 @@
                             <i class="fas fa-info-circle me-2"></i>
                             <div>
                                 <h6 class="mb-1">${person} needs to receive ₹${Math.abs(balance).toFixed(2)}</h6>
-                                <p class="mb-0">Select the people who have paid ${person} and enter the settled amount:</p>
+                                <p class="mb-0">The following people need to pay ${person}:</p>
                             </div>
                         </div>
                     </div>
                     <div class="settlement-details">
-                        ${Object.keys(individualDebts)
-                            .filter(p => individualDebts[p][person] > 0)
-                            .map(p => {
-                                const amountOwed = individualDebts[p][person];
-                                return `
-                                    <div class="settlement-item">
-                                        <div class="settlement-avatar">
-                                            <input type="checkbox" class="settlement-checkbox" data-from="${p}" data-to="${person}" onchange="toggleSettlement(this)">
-                                            <div class="avatar-small accent-bg">${p.charAt(0).toUpperCase()}</div>
-                                            <span>${p}</span>
-                                        </div>
-                                        <div class="d-flex align-items-center">
-                                            <span class="me-2">Owes: ₹${amountOwed.toFixed(2)}</span>
-                                            <div class="input-group amount-input">
-                                                <span class="input-group-text">₹</span>
-                                                <input type="number" class="form-control settlement-amount-input" data-from="${p}" data-to="${person}" 
-                                                       placeholder="${amountOwed.toFixed(2)}" step="0.01" min="0" max="${amountOwed}" 
-                                                       value="${amountOwed.toFixed(2)}" onchange="updateSettlementAmount(this)">
-                                            </div>
-                                        </div>
+                        ${Object.keys(balances)
+                            .filter(p => balances[p] < 0 && p !== person)
+                            .map(p => `
+                                <div class="settlement-item">
+                                    <div class="settlement-avatar">
+                                        <div class="avatar-small accent-bg">${p.charAt(0).toUpperCase()}</div>
+                                        <span>${p}</span>
                                     </div>
-                                `;
-                            }).join('')}
+                                    <div class="settlement-amount">₹${Math.abs(balances[p]).toFixed(2)}</div>
+                                </div>
+                            `).join('')}
                     </div>
                     <div class="mt-3">
-                        <span class="smart-suggestion">Partial Settlement</span>
-                        <p class="mt-2">You can select specific people who have paid ${person} and adjust the settled amount if needed.</p>
+                        <span class="smart-suggestion">Smart Suggestion</span>
+                        <p class="mt-2">We recommend settling all debts in one transaction for efficiency.</p>
                     </div>
                 `;
             } else {
@@ -2239,38 +2032,26 @@
                             <i class="fas fa-info-circle me-2"></i>
                             <div>
                                 <h6 class="mb-1">${person} needs to pay ₹${Math.abs(balance).toFixed(2)}</h6>
-                                <p class="mb-0">Select the people ${person} has paid and enter the settled amount:</p>
+                                <p class="mb-0">${person} should pay the following people:</p>
                             </div>
                         </div>
                     </div>
                     <div class="settlement-details">
-                        ${Object.keys(individualDebts[person] || {})
-                            .filter(p => individualDebts[person][p] > 0)
-                            .map(p => {
-                                const amountOwed = individualDebts[person][p];
-                                return `
-                                    <div class="settlement-item">
-                                        <div class="settlement-avatar">
-                                            <input type="checkbox" class="settlement-checkbox" data-from="${person}" data-to="${p}" onchange="toggleSettlement(this)">
-                                            <div class="avatar-small gradient-bg">${p.charAt(0).toUpperCase()}</div>
-                                            <span>${p}</span>
-                                        </div>
-                                        <div class="d-flex align-items-center">
-                                            <span class="me-2">Owes: ₹${amountOwed.toFixed(2)}</span>
-                                            <div class="input-group amount-input">
-                                                <span class="input-group-text">₹</span>
-                                                <input type="number" class="form-control settlement-amount-input" data-from="${person}" data-to="${p}" 
-                                                       placeholder="${amountOwed.toFixed(2)}" step="0.01" min="0" max="${amountOwed}" 
-                                                       value="${amountOwed.toFixed(2)}" onchange="updateSettlementAmount(this)">
-                                            </div>
-                                        </div>
+                        ${Object.keys(balances)
+                            .filter(p => balances[p] > 0 && p !== person)
+                            .map(p => `
+                                <div class="settlement-item">
+                                    <div class="settlement-avatar">
+                                        <div class="avatar-small gradient-bg">${p.charAt(0).toUpperCase()}</div>
+                                        <span>${p}</span>
                                     </div>
-                                `;
-                            }).join('')}
+                                    <div class="settlement-amount">₹${Math.abs(balances[p]).toFixed(2)}</div>
+                                </div>
+                            `).join('')}
                     </div>
                     <div class="mt-3">
-                        <span class="smart-suggestion">Partial Settlement</span>
-                        <p class="mt-2">You can select specific people that ${person} has paid and adjust the settled amount if needed.</p>
+                        <span class="smart-suggestion">Payment Breakdown</span>
+                        <p class="mt-2">${person} should distribute payments as shown above to settle all debts.</p>
                     </div>
                 `;
             }
@@ -2280,77 +2061,14 @@
             modal.show();
         }
         
-        // Toggle settlement selection
-        function toggleSettlement(checkbox) {
-            const fromPerson = checkbox.getAttribute('data-from');
-            const toPerson = checkbox.getAttribute('data-to');
+        // Mark as settled
+        function markAsSettled() {
+            showToast(`Settlement marked as completed for ${currentSettlementPerson}`, 'success');
             
-            // Find the amount input for this settlement
-            const amountInput = document.querySelector(`.settlement-amount-input[data-from="${fromPerson}"][data-to="${toPerson}"]`);
-            const amount = parseFloat(amountInput.value) || 0;
-            
-            if (checkbox.checked) {
-                selectedSettlements.push({
-                    fromPerson: fromPerson,
-                    toPerson: toPerson,
-                    amount: amount
-                });
-            } else {
-                selectedSettlements = selectedSettlements.filter(s => 
-                    !(s.fromPerson === fromPerson && s.toPerson === toPerson)
-                );
-            }
-        }
-        
-        // Update settlement amount when input changes
-        function updateSettlementAmount(input) {
-            const fromPerson = input.getAttribute('data-from');
-            const toPerson = input.getAttribute('data-to');
-            const amount = parseFloat(input.value) || 0;
-            
-            // Update the selected settlement if it exists
-            const existingSettlement = selectedSettlements.find(s => 
-                s.fromPerson === fromPerson && s.toPerson === toPerson
-            );
-            
-            if (existingSettlement) {
-                existingSettlement.amount = amount;
-            }
-        }
-        
-        // Mark selected settlements as settled
-        function markSelectedAsSettled() {
-            if (selectedSettlements.length === 0) {
-                showToast('Please select at least one settlement to mark as settled', 'error');
-                return;
-            }
-            
-            // Create settlement objects for each selected settlement
-            selectedSettlements.forEach(settlement => {
-                const settlementObj = {
-                    id: Date.now().toString() + Math.random(),
-                    fromPerson: settlement.fromPerson,
-                    toPerson: settlement.toPerson,
-                    amount: settlement.amount,
-                    date: new Date().toISOString().split('T')[0],
-                    timestamp: new Date()
-                };
-                
-                // Add to settlements array
-                settlements.push(settlementObj);
-                
-                // Save to Firebase
-                saveSettlementToFirestore(settlementObj);
-            });
-            
-            showToast(`${selectedSettlements.length} settlement(s) marked as completed`, 'success');
-            
-            // Close the modal
+            // In a real app, you would update the balances here
+            // For this demo, we'll just close the modal
             const modal = bootstrap.Modal.getInstance(document.getElementById('balanceSettlementModal'));
             modal.hide();
-            
-            // Update dashboard
-            updateDashboard();
         }
         
         // Update participants dashboard
@@ -2381,21 +2099,11 @@
             allParticipants.forEach(participant => {
                 const participantItem = document.createElement('div');
                 participantItem.className = 'balance-item';
-                participantItem.onclick = () => showParticipantDetails(participant);
                 
                 // Calculate total spent by this participant
                 const totalSpent = expenses
                     .filter(expense => expense.paidBy === participant)
                     .reduce((sum, expense) => sum + expense.amount, 0);
-                
-                // Calculate total settled by this participant
-                const totalSettled = settlements
-                    .filter(settlement => settlement.fromPerson === participant || settlement.toPerson === participant)
-                    .reduce((sum, settlement) => sum + settlement.amount, 0);
-                
-                // Calculate current balance
-                const balances = calculateBalances();
-                const currentBalance = balances[participant] || 0;
                 
                 participantItem.innerHTML = `
                     <div class="balance-details">
@@ -2405,128 +2113,15 @@
                         <div>
                             <h5 class="mb-1">${participant}</h5>
                             <p class="mb-0 text-muted">Total spent: ₹${totalSpent.toFixed(2)}</p>
-                            <p class="mb-0 text-muted ${currentBalance === 0 ? 'text-success' : currentBalance > 0 ? 'balance-positive' : 'balance-negative'}">
-                                Balance: ₹${Math.abs(currentBalance).toFixed(2)} ${currentBalance === 0 ? 'Settled' : currentBalance > 0 ? 'To receive' : 'To pay'}
-                            </p>
                         </div>
                     </div>
                     <div>
-                        <span class="badge ${currentBalance === 0 ? 'bg-success' : currentBalance > 0 ? 'bg-info' : 'bg-warning'}">
-                            ${currentBalance === 0 ? 'Settled' : currentBalance > 0 ? 'To receive' : 'To pay'}
-                        </span>
-                        <i class="fas fa-chevron-right ms-2 text-muted"></i>
+                        <span class="badge bg-primary">${participant === 'You' ? 'You' : 'Participant'}</span>
                     </div>
                 `;
                 
                 participantsDashboardList.appendChild(participantItem);
             });
-        }
-        
-        // Show participant details
-        function showParticipantDetails(participant) {
-            currentParticipantDetails = participant;
-            document.getElementById('participantDetailsTitle').textContent = `Participant Details - ${participant}`;
-            
-            // Calculate participant stats
-            const totalSpent = expenses
-                .filter(expense => expense.paidBy === participant)
-                .reduce((sum, expense) => sum + expense.amount, 0);
-            
-            const totalSettled = settlements
-                .filter(settlement => settlement.fromPerson === participant || settlement.toPerson === participant)
-                .reduce((sum, settlement) => sum + settlement.amount, 0);
-            
-            const balances = calculateBalances();
-            const currentBalance = balances[participant] || 0;
-            
-            // Get individual debts
-            const individualDebts = calculateIndividualDebts();
-            
-            // Get settlement history for this participant
-            const participantSettlements = settlements
-                .filter(settlement => settlement.fromPerson === participant || settlement.toPerson === participant)
-                .sort((a, b) => new Date(b.date) - new Date(a.date));
-            
-            const participantDetailsContent = document.getElementById('participantDetailsContent');
-            
-            participantDetailsContent.innerHTML = `
-                <div class="participant-stats">
-                    <div class="participant-stat">
-                        <div class="participant-stat-value">₹${totalSpent.toFixed(2)}</div>
-                        <div class="participant-stat-label">Total Spent</div>
-                    </div>
-                    <div class="participant-stat">
-                        <div class="participant-stat-value">₹${totalSettled.toFixed(2)}</div>
-                        <div class="participant-stat-label">Total Settled</div>
-                    </div>
-                    <div class="participant-stat">
-                        <div class="participant-stat-value ${currentBalance >= 0 ? 'balance-positive' : 'balance-negative'}">₹${Math.abs(currentBalance).toFixed(2)}</div>
-                        <div class="participant-stat-label">${currentBalance >= 0 ? 'To Receive' : 'To Pay'}</div>
-                    </div>
-                </div>
-                
-                <div class="participant-details-card">
-                    <h6>Individual Debts</h6>
-                    ${Object.keys(individualDebts[participant] || {})
-                        .filter(p => individualDebts[participant][p] > 0)
-                        .map(p => `
-                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                <span>Owes to ${p}</span>
-                                <span class="balance-negative">₹${individualDebts[participant][p].toFixed(2)}</span>
-                            </div>
-                        `).join('')}
-                    ${Object.keys(individualDebts)
-                        .filter(p => individualDebts[p][participant] > 0)
-                        .map(p => `
-                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                                <span>Owes from ${p}</span>
-                                <span class="balance-positive">₹${individualDebts[p][participant].toFixed(2)}</span>
-                            </div>
-                        `).join('')}
-                    ${(!individualDebts[participant] || Object.keys(individualDebts[participant]).length === 0) && 
-                      Object.keys(individualDebts).filter(p => individualDebts[p][participant] > 0).length === 0 ?
-                        '<p class="text-muted">No individual debts</p>' : ''}
-                </div>
-                
-                <div class="participant-details-card">
-                    <h6>Settlement History</h6>
-                    ${participantSettlements.length > 0 ? 
-                        participantSettlements.map(settlement => {
-                            const isPayer = settlement.fromPerson === participant;
-                            const otherPerson = isPayer ? settlement.toPerson : settlement.fromPerson;
-                            return `
-                                <div class="settlement-history-item">
-                                    <div>
-                                        <strong>₹${settlement.amount.toFixed(2)}</strong>
-                                        <div class="settlement-history-date">${formatDate(settlement.date)}</div>
-                                        <small class="text-muted">${isPayer ? 'Paid to' : 'Received from'} ${otherPerson}</small>
-                                    </div>
-                                    <span class="badge ${isPayer ? 'bg-warning' : 'bg-success'}">
-                                        ${isPayer ? 'Paid' : 'Received'}
-                                    </span>
-                                </div>
-                            `;
-                        }).join('') : 
-                        '<p class="text-muted">No settlement history yet.</p>'
-                    }
-                </div>
-            `;
-            
-            // Show modal
-            const modal = new bootstrap.Modal(document.getElementById('participantDetailsModal'));
-            modal.show();
-        }
-        
-        // Show settlement for current participant
-        function showSettlementForParticipant() {
-            if (!currentParticipantDetails) return;
-            
-            const balances = calculateBalances();
-            showSettlementDetails(currentParticipantDetails, balances);
-            
-            // Close participant details modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('participantDetailsModal'));
-            modal.hide();
         }
         
         // Show expense details in modal
